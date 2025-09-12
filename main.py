@@ -10,10 +10,7 @@ import aiohttp
 import os
 import logging
 from typing import List, Dict, Any, Optional
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
+# Railway sets environment variables automatically
 
 # Initialize logger
 logging.basicConfig(level=logging.INFO)
