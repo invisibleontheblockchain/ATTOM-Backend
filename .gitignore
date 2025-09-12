@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+.env
+.env.production
+.env.local
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+
+# Dependencies
+node_modules/
+
+# Database
+*.db
+*.sqlite
+
+# Railway
+.railway/
