@@ -579,8 +579,8 @@ async def get_property_details(property_id: str):
                     
                     if properties:
                         # Return normalized property data
-                        normalized = normalize_property(properties[0])
-                        if normalized.get("id"):
+                        normalized = normalize_property_with_logging(properties[0])
+                        if normalized and normalized.get("id"):
                             logger.info(f"Found property details for ID {property_id}")
                             return normalized
                 
@@ -603,7 +603,7 @@ async def get_property_details(property_id: str):
                                 prop_id = prop.get("identifier", {}).get("attomId", "")
                                 if prop_id == property_id:
                                     logger.info(f"Found property {property_id} in search results")
-                                    return normalize_property(prop)
+                                    return normalize_property_with_logging(prop)
         
         # If all else fails, return a comprehensive mock property
         logger.warning(f"Could not find property {property_id}, returning mock data")
