@@ -10,11 +10,17 @@ import aiohttp
 import os
 import logging
 from typing import List, Dict, Any, Optional
-# Railway sets environment variables automatically
+# Load environment variables
+from dotenv import load_dotenv
+load_dotenv()
 
-# Initialize logger
-logging.basicConfig(level=logging.INFO)
+# Initialize logger with more detailed formatting
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 # Create FastAPI app
 app = FastAPI(
@@ -35,7 +41,10 @@ app.add_middleware(
 )
 
 # ATTOM API configuration
-ATTOM_API_KEY = os.getenv("ATTOM_API_KEY", "6a03f7ae77a835285d8ce141b2f1ac9f")
+ATTOM_API_KEY = os.getenv("ATTOM_API_KEY")
+if not ATTOM_API_KEY:
+    logger.error("ATTOM_API_KEY environment variable is not set")
+    raise ValueError("ATTOM_API_KEY environment variable is required")
 ATTOM_BASE_URL = "https://api.gateway.attomdata.com/propertyapi/v1.0.0"
 
 # ZIP code mappings for major cities
@@ -245,6 +254,29 @@ async def get_market_analytics(
 
 # Start the application
 if __name__ == "__main__":
-    import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    try:
+        import uvicorn
+        import sys
+        
+        # Log Python version and environment
+        logger.debug(f"Python version: {sys.version}")
+        logger.debug(f"Current directory: {os.getcwd()}")
+        logger.debug(f"ATTOM_API_KEY configured: {bool(ATTOM_API_KEY)}")
+        
+        # Configure uvicorn with more detailed logging
+        port = int(os.getenv("PORT", 8000))
+        logger.info(f"Starting server on port {port}")
+        
+        config = uvicorn.Config(
+            app=app,
+            host="0.0.0.0",
+            port=port,
+            log_level="debug",
+            reload=True,
+            access_log=True
+        )
+        server = uvicorn.Server(config)
+        server.run()
+    except Exception as e:
+        logger.error(f"Failed to start server: {str(e)}", exc_info=True)
+        raise
