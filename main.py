@@ -410,32 +410,46 @@ def normalize_property_with_logging(attom_property: Dict) -> Dict:
         price = next((p for p in price_fields if p > 0), 0)
         logger.info(f"   💵 Price Attempts: {price_fields} → Final: {price}")
         
-        # Property specs
+        # Extract additional sections revealed in logs
+        lot = attom_property.get("lot", {})
+        location = attom_property.get("location", {})
+        summary = attom_property.get("summary", {})
+        
+        # Property specs - using CORRECT field paths from logs
         bedrooms = safe_int(rooms.get("beds"))
         bathrooms = safe_float(rooms.get("bathstotal"))
-        square_feet = safe_int(size.get("livingsize"))
-        year_built = safe_int(construction.get("yearbuilt"))
-        lot_size = safe_int(size.get("lotsize1"))
+        square_feet = safe_int(size.get("universalsize"))  # FIXED: was livingsize
+        year_built = safe_int(summary.get("yearbuilt"))    # FIXED: was in construction
+        lot_size = safe_int(lot.get("lotSize1"))           # FIXED: was in size
         
         logger.info(f"   🏠 Property Specs:")
         logger.info(f"      Bedrooms: {rooms.get('beds')} → {bedrooms}")
         logger.info(f"      Bathrooms: {rooms.get('bathstotal')} → {bathrooms}")
-        logger.info(f"      Square Feet: {size.get('livingsize')} → {square_feet}")
-        logger.info(f"      Year Built: {construction.get('yearbuilt')} → {year_built}")
-        logger.info(f"      Lot Size: {size.get('lotsize1')} → {lot_size}")
+        logger.info(f"      Square Feet: {size.get('universalsize')} → {square_feet}")
+        logger.info(f"      Year Built: {summary.get('yearbuilt')} → {year_built}")
+        logger.info(f"      Lot Size: {lot.get('lotSize1')} → {lot_size}")
         
-        # Location coordinates
-        geoid = address.get("geoid", {}) if address else {}
-        latitude = safe_float(geoid.get("latitude"))
-        longitude = safe_float(geoid.get("longitude"))
+        # Location coordinates - FIXED: using location section
+        latitude = safe_float(location.get("latitude"))
+        longitude = safe_float(location.get("longitude"))
         
-        logger.info(f"   🌍 Coordinates: lat={geoid.get('latitude')} lon={geoid.get('longitude')} → {latitude}, {longitude}")
+        logger.info(f"   🌍 Coordinates: lat={location.get('latitude')} lon={location.get('longitude')} → {latitude}, {longitude}")
         
-        # Property type
-        raw_property_type = safe_get(construction, "constructiontype", "")
-        property_type = "single_family"  # Default for now
+        # Property type - FIXED: using summary section
+        raw_property_type = summary.get("propertyType", "")
+        prop_type = summary.get("proptype", "")
         
-        logger.info(f"   🏘️  Property Type: {raw_property_type} → {property_type}")
+        # Normalize property type based on ATTOM data
+        if "CONDOMINIUM" in raw_property_type.upper():
+            property_type = "condo"
+        elif "SFR" in prop_type or "SINGLE FAMILY" in raw_property_type.upper():
+            property_type = "single_family"
+        elif "TOWNHOUSE" in raw_property_type.upper():
+            property_type = "townhouse"
+        else:
+            property_type = "single_family"  # Default
+        
+        logger.info(f"   🏘️  Property Type: {raw_property_type} ({prop_type}) → {property_type}")
         
         # Build final normalized property
         normalized = {
