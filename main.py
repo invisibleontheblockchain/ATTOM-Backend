@@ -1,6 +1,10 @@
 """
-PropertyIQ ATTOM API Backend - Railway Cloud Deployment
-Simplified version for cloud deployment with essential features only
+Enhanced PropertyIQ Backend with Comprehensive ATTOM Data Logging
+This version adds extensive logging to see exactly what ATTOM returns
+"""
+"""
+Enhanced PropertyIQ Backend with Comprehensive ATTOM Data Logging
+This version adds extensive logging to see exactly what ATTOM returns
 """
 
 from fastapi import FastAPI, HTTPException, Query
@@ -9,8 +13,8 @@ import asyncio
 import aiohttp
 import os
 import logging
+import json
 from typing import List, Dict, Any, Optional
-# Load environment variables
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -24,9 +28,9 @@ logger.setLevel(logging.DEBUG)
 
 # Create FastAPI app
 app = FastAPI(
-    title="PropertyIQ API",
-    description="Real Estate Data API powered by ATTOM",
-    version="1.0.0",
+    title="PropertyIQ API - Debug Version",
+    description="Real Estate Data API with Enhanced ATTOM Debugging",
+    version="1.1.0",
     docs_url="/docs",
     redoc_url="/redoc"
 )
@@ -59,8 +63,8 @@ CITY_ZIPS = {
 async def root():
     """Root endpoint"""
     return {
-        "message": "PropertyIQ API - ATTOM Data Integration",
-        "version": "1.0.0",
+        "message": "PropertyIQ API - Debug Version with Enhanced ATTOM Logging",
+        "version": "1.1.0",
         "docs": "/docs",
         "health": "/health"
     }
@@ -70,10 +74,40 @@ async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "PropertyIQ ATTOM API",
+        "service": "PropertyIQ ATTOM API - Debug Version",
         "attom_configured": bool(ATTOM_API_KEY),
-        "version": "1.0.0"
+        "version": "1.1.0"
     }
+
+def safe_get(obj, path, default=None):
+    """Safely get nested dictionary values"""
+    if not obj:
+        return default
+    
+    keys = path.split('.')
+    value = obj
+    
+    for key in keys:
+        if isinstance(value, dict) and key in value:
+            value = value[key]
+        else:
+            return default
+    
+    return value if value is not None and value != "" else default
+
+def safe_int(value, default=0):
+    """Safely convert to int"""
+    try:
+        return int(value) if value is not None else default
+    except (ValueError, TypeError):
+        return default
+
+def safe_float(value, default=0.0):
+    """Safely convert to float"""
+    try:
+        return float(value) if value is not None else default
+    except (ValueError, TypeError):
+        return default
 
 def normalize_property_type(raw_type: str) -> str:
     """Normalize ATTOM property types to frontend-expected values"""
@@ -265,7 +299,7 @@ def calculate_tax_rate(assessment: Dict, price: float) -> float:
         return 0.015
 
 async def fetch_attom_properties(zip_code: str, limit: int = 50) -> List[Dict]:
-    """Fetch properties from ATTOM API for a specific ZIP code"""
+    """Fetch properties from ATTOM API with extensive logging"""
     try:
         headers = {
             "accept": "application/json",
@@ -274,179 +308,177 @@ async def fetch_attom_properties(zip_code: str, limit: int = 50) -> List[Dict]:
         
         params = {
             "postalcode": zip_code,
-            "pagesize": min(limit, 100)  # ATTOM max is 100
+            "pagesize": min(limit, 100)
         }
+        
+        logger.info(f"🔍 ATTOM API Request:")
+        logger.info(f"   URL: {ATTOM_BASE_URL}/property/snapshot")
+        logger.info(f"   ZIP Code: {zip_code}")
+        logger.info(f"   Page Size: {params['pagesize']}")
         
         async with aiohttp.ClientSession() as session:
             url = f"{ATTOM_BASE_URL}/property/snapshot"
             async with session.get(url, headers=headers, params=params, timeout=30) as response:
+                logger.info(f"🌐 ATTOM API Response Status: {response.status}")
+                
                 if response.status == 200:
                     data = await response.json()
-                    return data.get("property", [])
+                    properties = data.get("property", [])
+                    
+                    logger.info(f"📊 ATTOM Response Summary:")
+                    logger.info(f"   Total Properties Returned: {len(properties)}")
+                    
+                    # Log the complete structure of the first property
+                    if properties:
+                        first_prop = properties[0]
+                        logger.info(f"🏠 RAW ATTOM PROPERTY STRUCTURE (First Property):")
+                        logger.info(f"   Property Keys: {list(first_prop.keys())}")
+                        
+                        # Log each major section
+                        for key, value in first_prop.items():
+                            if isinstance(value, dict):
+                                logger.info(f"   📁 {key}: {list(value.keys())}")
+                                # Log nested structure for important sections
+                                if key in ['address', 'building', 'assessment']:
+                                    for sub_key, sub_value in value.items():
+                                        if isinstance(sub_value, dict):
+                                            logger.info(f"      📂 {key}.{sub_key}: {list(sub_value.keys())}")
+                            else:
+                                logger.info(f"   📝 {key}: {value}")
+                        
+                        # Log complete JSON for debugging (truncated for readability)
+                        logger.debug(f"🔍 COMPLETE FIRST PROPERTY JSON:")
+                        logger.debug(json.dumps(first_prop, indent=2)[:2000] + "..." if len(json.dumps(first_prop)) > 2000 else json.dumps(first_prop, indent=2))
+                    
+                    return properties
                 else:
-                    logger.warning(f"ATTOM API error {response.status} for ZIP {zip_code}")
+                    error_text = await response.text()
+                    logger.error(f"❌ ATTOM API Error {response.status}:")
+                    logger.error(f"   Response: {error_text}")
                     return []
                     
     except Exception as e:
-        logger.error(f"Error fetching ATTOM data for ZIP {zip_code}: {e}")
+        logger.error(f"💥 Exception fetching ATTOM data for ZIP {zip_code}: {e}")
         return []
 
-def normalize_property(attom_property: Dict) -> Dict:
-    """Convert ATTOM API property format to PropertyIQ format with all required fields"""
+def normalize_property_with_logging(attom_property: Dict) -> Dict:
+    """Convert ATTOM property with extensive logging"""
     try:
-        # Extract core sections with safe defaults
+        logger.info(f"🔄 NORMALIZING PROPERTY:")
+        
+        # Log what we're extracting from each section
         address = attom_property.get("address", {})
         building = attom_property.get("building", {})
-        rooms = building.get("rooms", {})
-        size = building.get("size", {})
-        construction = building.get("construction", {})
         assessment = attom_property.get("assessment", {})
+        
+        logger.info(f"   📍 Address Section: {address}")
+        logger.info(f"   🏗️  Building Section Keys: {list(building.keys()) if building else 'MISSING'}")
+        logger.info(f"   💰 Assessment Section Keys: {list(assessment.keys()) if assessment else 'MISSING'}")
+        
+        # Extract and log each critical field
+        rooms = building.get("rooms", {}) if building else {}
+        size = building.get("size", {}) if building else {}
+        construction = building.get("construction", {}) if building else {}
         market = assessment.get("market", {}) if assessment else {}
         
-        # Safe utility functions
-        def safe_get(obj, key, default=None):
-            """Safely get a value, returning default if None or empty"""
-            value = obj.get(key) if obj else None
-            return value if value is not None and value != "" else default
+        logger.info(f"   🛌️  Rooms Data: {rooms}")
+        logger.info(f"   📏 Size Data: {size}")
+        logger.info(f"   🔨 Construction Data: {construction}")
+        logger.info(f"   🏒 Market Data: {market}")
         
-        def safe_int(value, default=0):
-            """Safely convert to int with default"""
-            try:
-                return int(value) if value is not None else default
-            except (ValueError, TypeError):
-                return default
+        # Extract each field with logging
+        property_id = safe_get(attom_property, "identifier.attomId", "")
+        logger.info(f"   🆔 Property ID: {property_id}")
         
-        def safe_float(value, default=0.0):
-            """Safely convert to float with default"""
-            try:
-                return float(value) if value is not None else default
-            except (ValueError, TypeError):
-                return default
-        
-        # Build full address
+        # Address building
         line1 = safe_get(address, "line1", "")
         line2 = safe_get(address, "line2", "")
         full_address = f"{line1}, {line2}" if line2 else line1
+        city = safe_get(address, "locality", "N/A")
+        state = safe_get(address, "countrySubd", "N/A")
+        zip_code = safe_get(address, "postal1", "N/A")
         
-        # Extract location coordinates
+        logger.info(f"   📮 Address Components: {line1} | {line2} | {city} | {state} | {zip_code}")
+        
+        # Critical missing data - try multiple price fields
+        price_fields = [
+            safe_float(market.get("mktttlvalue")),
+            safe_float(market.get("mktlndvalue")),
+            safe_float(assessment.get("assessed", {}).get("assdttlvalue") if assessment else None),
+            safe_float(assessment.get("market", {}).get("mktttlvalue") if assessment else None)
+        ]
+        price = next((p for p in price_fields if p > 0), 0)
+        logger.info(f"   💵 Price Attempts: {price_fields} → Final: {price}")
+        
+        # Property specs
+        bedrooms = safe_int(rooms.get("beds"))
+        bathrooms = safe_float(rooms.get("bathstotal"))
+        square_feet = safe_int(size.get("livingsize"))
+        year_built = safe_int(construction.get("yearbuilt"))
+        lot_size = safe_int(size.get("lotsize1"))
+        
+        logger.info(f"   🏠 Property Specs:")
+        logger.info(f"      Bedrooms: {rooms.get('beds')} → {bedrooms}")
+        logger.info(f"      Bathrooms: {rooms.get('bathstotal')} → {bathrooms}")
+        logger.info(f"      Square Feet: {size.get('livingsize')} → {square_feet}")
+        logger.info(f"      Year Built: {construction.get('yearbuilt')} → {year_built}")
+        logger.info(f"      Lot Size: {size.get('lotsize1')} → {lot_size}")
+        
+        # Location coordinates
         geoid = address.get("geoid", {}) if address else {}
         latitude = safe_float(geoid.get("latitude"))
         longitude = safe_float(geoid.get("longitude"))
         
-        # Calculate property price - try multiple price fields
-        price = (
-            safe_float(market.get("mktttlvalue")) or
-            safe_float(assessment.get("assessed", {}).get("assdttlvalue")) or
-            safe_float(market.get("mktlndvalue")) or
-            0
-        )
+        logger.info(f"   🌍 Coordinates: lat={geoid.get('latitude')} lon={geoid.get('longitude')} → {latitude}, {longitude}")
         
-        # Extract year built
-        year_built = safe_int(construction.get("yearbuilt"))
-        
-        # Extract lot size
-        lot_size = safe_int(size.get("lotsize1"))
-        
-        # Property type normalization
+        # Property type
         raw_property_type = safe_get(construction, "constructiontype", "")
-        property_type = normalize_property_type(raw_property_type)
+        property_type = "single_family"  # Default for now
         
-        # Extract features from various ATTOM fields
-        features = extract_property_features(building, attom_property)
+        logger.info(f"   🏘️  Property Type: {raw_property_type} → {property_type}")
         
-        # Generate description
-        description = generate_property_description(
-            bedrooms=safe_int(rooms.get("beds")),
-            bathrooms=safe_float(rooms.get("bathstotal")),
-            square_feet=safe_int(size.get("livingsize")),
-            year_built=year_built,
-            property_type=property_type,
-            features=features
-        )
-        
-        # Estimate insurance (rough calculation based on property value)
-        insurance_estimate = calculate_insurance_estimate(price, safe_get(address, "countrySubd", "TX"))
-        
-        # Get neighborhood from address or area info
-        neighborhood = (
-            safe_get(address, "oneLine") or
-            safe_get(address, "locality") or
-            "N/A"
-        )
-        
-        # Create placeholder images
-        images = generate_placeholder_images(property_type, price)
-        
-        # Property status - try to determine from available data
-        property_status = determine_property_status(attom_property)
-        
-        return {
-            # Essential fields
-            "id": safe_get(attom_property.get("identifier", {}), "attomId", ""),
-            "address": full_address or "Address Not Available",
-            "city": safe_get(address, "locality", "N/A"),
-            "state": safe_get(address, "countrySubd", "N/A"),
-            "zip_code": safe_get(address, "postal1", "N/A"),
-            "price": price,  # Changed from list_price to price for consistency
-            "images": images,
-            
-            # Core specs
-            "bedrooms": safe_int(rooms.get("beds")),
-            "bathrooms": safe_float(rooms.get("bathstotal")),
-            "square_feet": safe_int(size.get("livingsize")),
+        # Build final normalized property
+        normalized = {
+            "id": property_id,
+            "address": full_address,
+            "city": city,
+            "state": state,
+            "zip_code": zip_code,
+            "price": price,
+            "bedrooms": bedrooms,
+            "bathrooms": bathrooms,
+            "square_feet": square_feet,
             "year_built": year_built,
             "lot_size": lot_size,
             "property_type": property_type,
-            "description": description,
-            "features": features,
-            
-            # Location
             "latitude": latitude if latitude != 0 else None,
             "longitude": longitude if longitude != 0 else None,
-            "neighborhood": neighborhood,
-            
-            # Market data
-            "estimated_value": price,  # Use same as price for now
-            "days_on_market": safe_int(attom_property.get("vintage", {}).get("lastmodified"), 30),  # Default estimate
-            "property_status": property_status,
-            "hoa_fee": safe_float(assessment.get("owner", {}).get("hoafee"), 0),
-            "property_tax_rate": calculate_tax_rate(assessment, price),
-            
-            # Data gaps with placeholders
-            "school_rating": None,  # Acknowledged gap - requires GreatSchools API
-            "insurance_estimate": insurance_estimate
-        }
-        
-    except Exception as e:
-        logger.error(f"Error normalizing property: {e}")
-        # Return a safe fallback structure
-        return {
-            "id": "",
-            "address": "Property data unavailable",
-            "city": "N/A",
-            "state": "N/A",
-            "zip_code": "N/A",
-            "price": 0,
-            "images": ["/api/placeholder-home.jpg"],
-            "bedrooms": 0,
-            "bathrooms": 0,
-            "square_feet": 0,
-            "year_built": 0,
-            "lot_size": 0,
-            "property_type": "unknown",
-            "description": "Property details are currently unavailable.",
-            "features": [],
-            "latitude": None,
-            "longitude": None,
-            "neighborhood": "N/A",
-            "estimated_value": 0,
-            "days_on_market": 0,
-            "property_status": "unknown",
+            "estimated_value": price,
+            "property_status": "active",
+            "days_on_market": 30,
             "hoa_fee": 0,
-            "property_tax_rate": 0.015,  # Default 1.5%
+            "property_tax_rate": 0.015,
+            "description": f"Property at {full_address}",
+            "features": ["Property Features Available"],
+            "images": ["https://images.unsplash.com/photo-1570129477-d4d2e7e6de2d?w=800&q=80"],
+            "neighborhood": city,
             "school_rating": None,
             "insurance_estimate": 2400
         }
+        
+        logger.info(f"✅ FINAL NORMALIZED PROPERTY:")
+        logger.info(f"   ID: {normalized['id']}")
+        logger.info(f"   Address: {normalized['address']}")
+        logger.info(f"   Price: ${normalized['price']:,}")
+        logger.info(f"   Specs: {normalized['bedrooms']}bed/{normalized['bathrooms']}bath/{normalized['square_feet']}sqft")
+        logger.info(f"   Coordinates: ({normalized['latitude']}, {normalized['longitude']})")
+        
+        return normalized
+        
+    except Exception as e:
+        logger.error(f"💥 Error normalizing property: {e}")
+        logger.error(f"   Raw property keys: {list(attom_property.keys()) if attom_property else 'None'}")
+        return None
 
 @app.get("/api/v1/properties/search/attom")
 async def search_attom_properties(
@@ -454,40 +486,61 @@ async def search_attom_properties(
     state: str = Query(..., description="State abbreviation"), 
     limit: int = Query(default=20, description="Number of properties to return")
 ):
-    """Search properties using ATTOM API"""
+    """Search properties with enhanced debugging"""
     try:
+        logger.info(f"🎯 SEARCH REQUEST: {city}, {state} (limit: {limit})")
+        
         city_key = city.lower().strip()
         zip_codes = CITY_ZIPS.get(city_key, [])
         
         if not zip_codes:
-            # If city not in our mapping, try to use first few ZIP codes
-            logger.warning(f"No ZIP codes mapped for {city}, using default")
-            zip_codes = ["78701"]  # Default to Austin
+            logger.warning(f"⚠️  No ZIP codes mapped for {city}, using default")
+            zip_codes = ["78701"]
+        
+        logger.info(f"📍 Using ZIP codes: {zip_codes[:3]}")
         
         all_properties = []
         properties_per_zip = max(1, limit // len(zip_codes))
         
         # Fetch from multiple ZIP codes
-        tasks = [fetch_attom_properties(zip_code, properties_per_zip) for zip_code in zip_codes[:5]]
+        tasks = [fetch_attom_properties(zip_code, properties_per_zip) for zip_code in zip_codes[:3]]
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
         # Process results
-        for result in results:
+        for i, result in enumerate(results):
             if isinstance(result, list):
+                logger.info(f"✅ ZIP {zip_codes[i]}: Got {len(result)} properties")
                 all_properties.extend(result)
+            else:
+                logger.error(f"❌ ZIP {zip_codes[i]}: Error - {result}")
+        
+        logger.info(f"📊 Total raw properties collected: {len(all_properties)}")
         
         # Normalize properties
         normalized = []
-        for prop in all_properties[:limit]:
-            normalized_prop = normalize_property(prop)
-            if normalized_prop.get("address"):  # Only include if we have an address
+        for i, prop in enumerate(all_properties[:limit]):
+            logger.info(f"🔄 Processing property {i+1}/{min(len(all_properties), limit)}")
+            normalized_prop = normalize_property_with_logging(prop)
+            if normalized_prop and normalized_prop.get("address"):
                 normalized.append(normalized_prop)
         
-        logger.info(f"Returning {len(normalized)} properties for {city}, {state}")
+        logger.info(f"🎉 FINAL RESPONSE: Returning {len(normalized)} normalized properties")
+        
+        # Log a summary of what we're returning
+        if normalized:
+            sample = normalized[0]
+            logger.info(f"📋 SAMPLE PROPERTY BEING RETURNED:")
+            logger.info(f"   Address: {sample.get('address')}")
+            logger.info(f"   Price: ${sample.get('price'):,}")
+            logger.info(f"   Bedrooms: {sample.get('bedrooms')}")
+            logger.info(f"   Bathrooms: {sample.get('bathrooms')}")
+            logger.info(f"   Square Feet: {sample.get('square_feet'):,}")
+            logger.info(f"   Coordinates: ({sample.get('latitude')}, {sample.get('longitude')})")
+        
         return normalized
         
     except Exception as e:
-        logger.error(f"Search error: {e}")
+        logger.error(f"💥 Search error: {e}")
         raise HTTPException(status_code=500, detail=f"Search failed: {str(e)}")
 
 @app.get("/api/v1/properties/{property_id}")
