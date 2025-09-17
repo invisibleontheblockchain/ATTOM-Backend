@@ -52,3 +52,17 @@ curl "https://your-app.railway.app/api/v1/properties/search/attom?city=Austin&st
 ```
 
 Built for PropertyIQ platform - Professional real estate investment analysis.
+
+## 📖 Complete Documentation
+
+For comprehensive API documentation, architecture details, and development guides, see:
+
+**[📋 API_DOCUMENTATION.md](./API_DOCUMENTATION.md)**
+
+Includes:
+- Complete endpoint documentation with examples
+- ATTOM API integration details
+- Data processing and normalization workflows
+- Deployment and monitoring guides
+- Troubleshooting and debugging information
+- Performance optimization strategies
