@@ -236,34 +236,43 @@ def calculate_insurance_estimate(price: float, state: str) -> float:
         return 2400
 
 def generate_placeholder_images(property_type: str, price: float) -> List[str]:
-    """Generate placeholder image URLs"""
+    """Generate high-quality property image URLs"""
     try:
-        # Different placeholders based on property type and price range
+        # High-quality real estate images from Unsplash
         base_url = "https://images.unsplash.com/photo"
         
         if property_type == "condo":
             return [
-                f"{base_url}-1560448204-603c3d5dd8fd?w=800&q=80",  # Modern condo
-                f"{base_url}-1560448204-d3395c3bf3e0?w=800&q=80"   # Condo interior
+                f"{base_url}-1560448204-603c3d5dd8fd?w=800&h=600&fit=crop&auto=format&q=80",  # Modern condo exterior
+                f"{base_url}-1586023492-413d21e96b22?w=800&h=600&fit=crop&auto=format&q=80",  # Modern interior
+                f"{base_url}-1505873242-726de7f43e5d?w=800&h=600&fit=crop&auto=format&q=80",  # Living room
+                f"{base_url}-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&auto=format&q=80"   # Kitchen
             ]
         elif property_type == "townhouse":
             return [
-                f"{base_url}-1570129477-8639e6e85b14?w=800&q=80",  # Townhouse row
-                f"{base_url}-1570129477-9f5c7e2bbed8?w=800&q=80"   # Townhouse detail
+                f"{base_url}-1570129477-8639e6e85b14?w=800&h=600&fit=crop&auto=format&q=80",  # Townhouse row
+                f"{base_url}-1588580005-f4ac57aa0b96?w=800&h=600&fit=crop&auto=format&q=80",  # Townhouse exterior
+                f"{base_url}-1505691723-85a4ee2a9b5a?w=800&h=600&fit=crop&auto=format&q=80",  # Modern interior
+                f"{base_url}-1556909049-5b38b4c37bb5?w=800&h=600&fit=crop&auto=format&q=80"   # Dining area
             ]
         else:  # Single family and others
             if price > 500000:
                 return [
-                    f"{base_url}-1564013799-7e9b35b4847d?w=800&q=80",  # Luxury home
-                    f"{base_url}-1570129477-cf1c2e7d8b9c?w=800&q=80"   # High-end interior
+                    f"{base_url}-1564013799-7e9b35b4847d?w=800&h=600&fit=crop&auto=format&q=80",  # Luxury home exterior
+                    f"{base_url}-1512917774-9fcf808cf876?w=800&h=600&fit=crop&auto=format&q=80",  # Luxury interior
+                    f"{base_url}-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&auto=format&q=80",  # Modern kitchen
+                    f"{base_url}-1505691938-2da3831ba2e5?w=800&h=600&fit=crop&auto=format&q=80",  # Master bedroom
+                    f"{base_url}-1484154218-0bf12d188ca6?w=800&h=600&fit=crop&auto=format&q=80"   # Bathroom
                 ]
             else:
                 return [
-                    f"{base_url}-1570129477-d4d2e7e6de2d?w=800&q=80",  # Standard home
-                    f"{base_url}-1586023492-413d21e96b22?w=800&q=80"   # Standard interior
+                    f"{base_url}-1580587771525-78b9dba3b914?w=800&h=600&fit=crop&auto=format&q=80",  # Standard home exterior
+                    f"{base_url}-1586023492-413d21e96b22?w=800&h=600&fit=crop&auto=format&q=80",  # Living room
+                    f"{base_url}-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&auto=format&q=80",  # Kitchen
+                    f"{base_url}-1505691938-2da3831ba2e5?w=800&h=600&fit=crop&auto=format&q=80"   # Bedroom
                 ]
     except Exception:
-        return ["/api/placeholder-home.jpg"]  # Ultimate fallback
+        return ["https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800&h=600&fit=crop&auto=format&q=80"]
 
 def determine_property_status(attom_property: Dict) -> str:
     """Determine property status from ATTOM data"""
@@ -298,26 +307,105 @@ def calculate_tax_rate(assessment: Dict, price: float) -> float:
     except Exception:
         return 0.015
 
+def estimate_property_price(bedrooms: int, bathrooms: float, square_feet: int, 
+                          year_built: int, property_type: str, city: str, state: str) -> float:
+    """Estimate property price when ATTOM market data is not available"""
+    try:
+        # Base price per square foot by state and property type
+        state_base_prices = {
+            "TX": {"condo": 200, "single_family": 180, "townhouse": 190},
+            "CA": {"condo": 400, "single_family": 350, "townhouse": 380},
+            "FL": {"condo": 250, "single_family": 220, "townhouse": 240},
+            "NY": {"condo": 450, "single_family": 300, "townhouse": 350}
+        }
+        
+        # Get base price per sqft
+        state_prices = state_base_prices.get(state, {"condo": 180, "single_family": 160, "townhouse": 170})
+        base_price_per_sqft = state_prices.get(property_type, 160)
+        
+        # Calculate base value
+        if square_feet > 0:
+            base_value = square_feet * base_price_per_sqft
+        else:
+            # Estimate square feet if missing
+            if bedrooms > 0:
+                estimated_sqft = bedrooms * 400 + bathrooms * 150  # Rough estimate
+                base_value = estimated_sqft * base_price_per_sqft
+            else:
+                base_value = 300000  # Default fallback
+        
+        # Adjustments based on property characteristics
+        multiplier = 1.0
+        
+        # Age adjustment
+        if year_built > 0:
+            age = 2024 - year_built
+            if age < 5:
+                multiplier *= 1.15  # New construction premium
+            elif age < 15:
+                multiplier *= 1.05  # Modern homes
+            elif age > 50:
+                multiplier *= 0.85  # Older homes discount
+        
+        # Size adjustments
+        if square_feet > 3000:
+            multiplier *= 1.20  # Large home premium
+        elif square_feet < 1000:
+            multiplier *= 0.80  # Small home discount
+        
+        # Bedroom/bathroom adjustments
+        if bedrooms >= 4:
+            multiplier *= 1.10  # Large family home premium
+        if bathrooms >= 3:
+            multiplier *= 1.05  # Multiple bathroom premium
+        
+        # City-specific adjustments (rough estimates)
+        city_multipliers = {
+            "austin": 1.20,
+            "dallas": 1.15,
+            "houston": 1.10,
+            "san antonio": 1.00
+        }
+        
+        city_mult = city_multipliers.get(city.lower(), 1.0)
+        multiplier *= city_mult
+        
+        # Calculate final estimated price
+        estimated_price = int(base_value * multiplier)
+        
+        # Reasonable bounds
+        estimated_price = max(100000, min(estimated_price, 2000000))
+        
+        return estimated_price
+        
+    except Exception as e:
+        logger.warning(f"Error estimating price: {e}")
+        return 350000  # Fallback default
+
 async def fetch_attom_properties(zip_code: str, limit: int = 50) -> List[Dict]:
-    """Fetch properties from ATTOM API with extensive logging"""
+    """Fetch properties from ATTOM API with market/assessment data"""
     try:
         headers = {
             "accept": "application/json",
             "apikey": ATTOM_API_KEY
         }
         
+        # Use expanded data to get assessment/market information
         params = {
             "postalcode": zip_code,
-            "pagesize": min(limit, 100)
+            "pagesize": min(limit, 100),
+            "show": "market,assessment,detail"  # Request market and assessment data
         }
         
         logger.info(f"🔍 ATTOM API Request:")
-        logger.info(f"   URL: {ATTOM_BASE_URL}/property/snapshot")
+        logger.info(f"   URL: {ATTOM_BASE_URL}/property/expandedprofile")
         logger.info(f"   ZIP Code: {zip_code}")
         logger.info(f"   Page Size: {params['pagesize']}")
+        logger.info(f"   Show: {params['show']}")
         
         async with aiohttp.ClientSession() as session:
-            url = f"{ATTOM_BASE_URL}/property/snapshot"
+            # Try expanded profile first for complete data
+            url = f"{ATTOM_BASE_URL}/property/expandedprofile"
             async with session.get(url, headers=headers, params=params, timeout=30) as response:
                 logger.info(f"🌐 ATTOM API Response Status: {response.status}")
                 
@@ -351,10 +439,30 @@ async def fetch_attom_properties(zip_code: str, limit: int = 50) -> List[Dict]:
                         logger.debug(json.dumps(first_prop, indent=2)[:2000] + "..." if len(json.dumps(first_prop)) > 2000 else json.dumps(first_prop, indent=2))
                     
                     return properties
+                
+                # If expandedprofile fails, fallback to snapshot with basic params
+                logger.warning(f"Expanded profile failed ({response.status}), trying basic snapshot")
+                error_text = await response.text()
+                logger.error(f"❌ ATTOM API Error {response.status}: {error_text}")
+            
+            # Fallback to basic snapshot endpoint
+            basic_params = {
+                "postalcode": zip_code,
+                "pagesize": min(limit, 100)
+            }
+            
+            url = f"{ATTOM_BASE_URL}/property/snapshot"
+            async with session.get(url, headers=headers, params=basic_params, timeout=30) as response:
+                logger.info(f"🌐 ATTOM API Fallback Response Status: {response.status}")
+                
+                if response.status == 200:
+                    data = await response.json()
+                    properties = data.get("property", [])
+                    logger.info(f"📊 Fallback Response: {len(properties)} properties returned")
+                    return properties
                 else:
                     error_text = await response.text()
-                    logger.error(f"❌ ATTOM API Error {response.status}:")
-                    logger.error(f"   Response: {error_text}")
+                    logger.error(f"❌ ATTOM API Fallback Error {response.status}: {error_text}")
                     return []
                     
     except Exception as e:
@@ -408,7 +516,6 @@ def normalize_property_with_logging(attom_property: Dict) -> Dict:
             safe_float(assessment.get("market", {}).get("mktttlvalue") if assessment else None)
         ]
         price = next((p for p in price_fields if p > 0), 0)
-        logger.info(f"   💵 Price Attempts: {price_fields} → Final: {price}")
         
         # Extract additional sections revealed in logs
         lot = attom_property.get("lot", {})
@@ -422,20 +529,7 @@ def normalize_property_with_logging(attom_property: Dict) -> Dict:
         year_built = safe_int(summary.get("yearbuilt"))    # FIXED: was in construction
         lot_size = safe_int(lot.get("lotSize1"))           # FIXED: was in size
         
-        logger.info(f"   🏠 Property Specs:")
-        logger.info(f"      Bedrooms: {rooms.get('beds')} → {bedrooms}")
-        logger.info(f"      Bathrooms: {rooms.get('bathstotal')} → {bathrooms}")
-        logger.info(f"      Square Feet: {size.get('universalsize')} → {square_feet}")
-        logger.info(f"      Year Built: {summary.get('yearbuilt')} → {year_built}")
-        logger.info(f"      Lot Size: {lot.get('lotSize1')} → {lot_size}")
-        
-        # Location coordinates - FIXED: using location section
-        latitude = safe_float(location.get("latitude"))
-        longitude = safe_float(location.get("longitude"))
-        
-        logger.info(f"   🌍 Coordinates: lat={location.get('latitude')} lon={location.get('longitude')} → {latitude}, {longitude}")
-        
-        # Property type - FIXED: using summary section
+        # Property type - determine before price estimation
         raw_property_type = summary.get("propertyType", "")
         prop_type = summary.get("proptype", "")
         
@@ -449,7 +543,43 @@ def normalize_property_with_logging(attom_property: Dict) -> Dict:
         else:
             property_type = "single_family"  # Default
         
+        # If no price found, estimate based on property characteristics
+        if price == 0:
+            price = estimate_property_price(bedrooms, bathrooms, square_feet, year_built, property_type, city, state)
+            logger.info(f"   💰 ESTIMATED PRICE: ${price:,} (no market data available)")
+        
+        logger.info(f"   💵 Price Attempts: {price_fields} → Final: ${price:,}")
+        
+        logger.info(f"   🏠 Property Specs:")
+        logger.info(f"      Bedrooms: {rooms.get('beds')} → {bedrooms}")
+        logger.info(f"      Bathrooms: {rooms.get('bathstotal')} → {bathrooms}")
+        logger.info(f"      Square Feet: {size.get('universalsize')} → {square_feet}")
+        logger.info(f"      Year Built: {summary.get('yearbuilt')} → {year_built}")
+        logger.info(f"      Lot Size: {lot.get('lotSize1')} → {lot_size}")
+        
+        # Location coordinates - FIXED: using location section
+        latitude = safe_float(location.get("latitude"))
+        longitude = safe_float(location.get("longitude"))
+        
+        logger.info(f"   🌍 Coordinates: lat={location.get('latitude')} lon={location.get('longitude')} → {latitude}, {longitude}")
         logger.info(f"   🏘️  Property Type: {raw_property_type} ({prop_type}) → {property_type}")
+        
+        # Extract enhanced features
+        features = extract_property_features(building, attom_property)
+        
+        # Generate comprehensive description
+        description = generate_property_description(
+            bedrooms, bathrooms, square_feet, year_built, property_type, features
+        )
+        
+        # Generate appropriate images based on property type and price
+        images = generate_placeholder_images(property_type, price)
+        
+        # Calculate insurance estimate
+        insurance_estimate = calculate_insurance_estimate(price, state)
+        
+        # Calculate tax rate
+        tax_rate = calculate_tax_rate(assessment, price)
         
         # Build final normalized property
         normalized = {
@@ -468,16 +598,16 @@ def normalize_property_with_logging(attom_property: Dict) -> Dict:
             "latitude": latitude if latitude != 0 else None,
             "longitude": longitude if longitude != 0 else None,
             "estimated_value": price,
-            "property_status": "active",
+            "property_status": determine_property_status(attom_property),
             "days_on_market": 30,
             "hoa_fee": 0,
-            "property_tax_rate": 0.015,
-            "description": f"Property at {full_address}",
-            "features": ["Property Features Available"],
-            "images": ["https://images.unsplash.com/photo-1570129477-d4d2e7e6de2d?w=800&q=80"],
+            "property_tax_rate": tax_rate,
+            "description": description,
+            "features": features,
+            "images": images,
             "neighborhood": city,
             "school_rating": None,
-            "insurance_estimate": 2400
+            "insurance_estimate": insurance_estimate
         }
         
         logger.info(f"✅ FINAL NORMALIZED PROPERTY:")
