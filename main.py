@@ -235,44 +235,83 @@ def calculate_insurance_estimate(price: float, state: str) -> float:
     except Exception:
         return 2400
 
-def generate_placeholder_images(property_type: str, price: float) -> List[str]:
-    """Generate high-quality property image URLs"""
+def generate_placeholder_images(property_type: str, price: float, property_id: str = "") -> List[str]:
+    """Generate unique property image URLs using property-specific parameters"""
     try:
-        # High-quality real estate images from Unsplash
-        base_url = "https://images.unsplash.com/photo"
+        # Create a hash from property_id to ensure consistent but unique images for each property
+        import hashlib
+        seed = hashlib.md5(f"{property_id}{property_type}{price}".encode()).hexdigest()[:8]
+        
+        # Base collections of property images - variety ensures uniqueness
+        image_pools = {
+            "condo_exterior": [
+                "1560448204-603c3d5dd8fd", "1486304873-dff033980b80", "1502672260-dd7cb95000a2",
+                "1515263487-5bc5e22ac0b5", "1540547142-3c4b7f12c3bc", "1524230659-aa05c3956c5f"
+            ],
+            "condo_interior": [
+                "1586023492-413d21e96b22", "1505873242-726de7f43e5d", "1556909114-f6e7ad7d3136",
+                "1556909045-56d2c769bab1", "1556909049-5b38b4c37bb5", "1505691723-85a4ee2a9b5a"
+            ],
+            "townhouse_exterior": [
+                "1570129477-8639e6e85b14", "1588580005-f4ac57aa0b96", "1518780664-f537786c8620",
+                "1512453979-9c4b444a8e00", "1516259762-be3ecec25bb7", "1600596542-248ac93d7c74"
+            ],
+            "single_family_luxury": [
+                "1564013799-7e9b35b4847d", "1512917774-9fcf808cf876", "1564013799-c5aa1c85dc3b",
+                "1600585154-4e4c9cfacde7", "1600566752-14c5b0e4b7e2", "1580587771525-68f10affe5ec"
+            ],
+            "single_family_standard": [
+                "1580587771525-78b9dba3b914", "1582268611958-3d37e8b8c894", "1493809842364-95aec1df3c9b",
+                "1600585154-6c8e5b5d08e3", "1600566752-9b0e8a6bb4bb", "1523217582-f8912cca2b62"
+            ],
+            "interiors": [
+                "1586023492-413d21e96b22", "1505873242-726de7f43e5d", "1556909114-f6e7ad7d3136",
+                "1505691938-2da3831ba2e5", "1556909045-56d2c769bab1", "1556909049-5b38b4c37bb5",
+                "1484154218-0bf12d188ca6", "1505691723-85a4ee2a9b5a", "1558618047-3bb2acc2ab2e"
+            ]
+        }
+        
+        # Generate unique indices based on property seed
+        def get_unique_image(pool_name: str, index: int) -> str:
+            pool = image_pools[pool_name]
+            # Use seed and index to pick from pool
+            pool_index = (int(seed, 16) + index) % len(pool)
+            return f"https://images.unsplash.com/photo-{pool[pool_index]}?w=800&h=600&fit=crop&auto=format&q=80&seed={seed}"
         
         if property_type == "condo":
             return [
-                f"{base_url}-1560448204-603c3d5dd8fd?w=800&h=600&fit=crop&auto=format&q=80",  # Modern condo exterior
-                f"{base_url}-1586023492-413d21e96b22?w=800&h=600&fit=crop&auto=format&q=80",  # Modern interior
-                f"{base_url}-1505873242-726de7f43e5d?w=800&h=600&fit=crop&auto=format&q=80",  # Living room
-                f"{base_url}-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&auto=format&q=80"   # Kitchen
+                get_unique_image("condo_exterior", 0),
+                get_unique_image("condo_interior", 0),
+                get_unique_image("interiors", 0),
+                get_unique_image("interiors", 1)
             ]
         elif property_type == "townhouse":
             return [
-                f"{base_url}-1570129477-8639e6e85b14?w=800&h=600&fit=crop&auto=format&q=80",  # Townhouse row
-                f"{base_url}-1588580005-f4ac57aa0b96?w=800&h=600&fit=crop&auto=format&q=80",  # Townhouse exterior
-                f"{base_url}-1505691723-85a4ee2a9b5a?w=800&h=600&fit=crop&auto=format&q=80",  # Modern interior
-                f"{base_url}-1556909049-5b38b4c37bb5?w=800&h=600&fit=crop&auto=format&q=80"   # Dining area
+                get_unique_image("townhouse_exterior", 0),
+                get_unique_image("townhouse_exterior", 1),
+                get_unique_image("interiors", 0),
+                get_unique_image("interiors", 1)
             ]
         else:  # Single family and others
             if price > 500000:
                 return [
-                    f"{base_url}-1564013799-7e9b35b4847d?w=800&h=600&fit=crop&auto=format&q=80",  # Luxury home exterior
-                    f"{base_url}-1512917774-9fcf808cf876?w=800&h=600&fit=crop&auto=format&q=80",  # Luxury interior
-                    f"{base_url}-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&auto=format&q=80",  # Modern kitchen
-                    f"{base_url}-1505691938-2da3831ba2e5?w=800&h=600&fit=crop&auto=format&q=80",  # Master bedroom
-                    f"{base_url}-1484154218-0bf12d188ca6?w=800&h=600&fit=crop&auto=format&q=80"   # Bathroom
+                    get_unique_image("single_family_luxury", 0),
+                    get_unique_image("single_family_luxury", 1),
+                    get_unique_image("interiors", 0),
+                    get_unique_image("interiors", 1),
+                    get_unique_image("interiors", 2)
                 ]
             else:
                 return [
-                    f"{base_url}-1580587771525-78b9dba3b914?w=800&h=600&fit=crop&auto=format&q=80",  # Standard home exterior
-                    f"{base_url}-1586023492-413d21e96b22?w=800&h=600&fit=crop&auto=format&q=80",  # Living room
-                    f"{base_url}-1556909114-f6e7ad7d3136?w=800&h=600&fit=crop&auto=format&q=80",  # Kitchen
-                    f"{base_url}-1505691938-2da3831ba2e5?w=800&h=600&fit=crop&auto=format&q=80"   # Bedroom
+                    get_unique_image("single_family_standard", 0),
+                    get_unique_image("single_family_standard", 1),
+                    get_unique_image("interiors", 0),
+                    get_unique_image("interiors", 1)
                 ]
     except Exception:
-        return ["https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800&h=600&fit=crop&auto=format&q=80"]
+        # Fallback with at least some variety
+        fallback_seed = len(property_id) % 10 if property_id else 0
+        return [f"https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800&h=600&fit=crop&auto=format&q=80&seed={fallback_seed}"]
 
 def determine_property_status(attom_property: Dict) -> str:
     """Determine property status from ATTOM data"""
@@ -573,7 +612,7 @@ def normalize_property_with_logging(attom_property: Dict) -> Dict:
         )
         
         # Generate appropriate images based on property type and price
-        images = generate_placeholder_images(property_type, price)
+        images = generate_placeholder_images(property_type, price, str(property_id))
         
         # Calculate insurance estimate
         insurance_estimate = calculate_insurance_estimate(price, state)
